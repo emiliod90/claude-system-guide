@@ -6,7 +6,7 @@ You will teach it and build it with your user, one part at a time.
 
 **How much is proven.** The designs and lessons come from daily use. The lean versions described
 here are new: an earlier version of Part 2 was test-built once from text alone, and Parts 3 to 5
-have not been. Claude Code also changes quickly, so check hook payloads and settings against
+have not been. Anything its owner does not currently run is marked as such. Claude Code also changes quickly, so check hook payloads and settings against
 https://code.claude.com/docs before relying on them, and test each hook once for real.
 
 ## How to run this guide
@@ -247,7 +247,8 @@ Bash, WebFetch, WebSearch, Read, Write, Edit`, `model: sonnet` and `maxTurns: 60
 These turn numbers are only instructions, with `maxTurns` the one hard limit. Add a `PreToolUse` hook
 on Write and Edit that denies this agent anything outside `reports/` and `drafts/`. Bash can still
 write elsewhere: a deny list for redirects, `rm`, `mv`, `git commit` and `wiki.py publish` closes the
-common gaps, but it is not a sandbox, so say so.
+common gaps, but it is not a sandbox, so say so. Our own review found an agent could still write by
+running a Python interpreter through Bash.
 
 ### Add to `~/.claude/CLAUDE.md`
 
@@ -335,7 +336,8 @@ the next session starts where this one stopped and nothing falls through.
    ~65,000 tokens, a small model run through `claude -p` with its own agent writes one JSON block: `intent`,
    `happened`, `agreed_decisions`, `open_decisions`, `open_questions`, `outcome`. A roll-up fills the index
    row's `outcome`. A session that ended with open questions in its blocks but no items gets an `UNTRACKED`
-   warning at the next start. Set `SESSION_LOG_SKIP=1` in these child runs so they do not log themselves.
+   warning at the next start. Set `SESSION_LOG_SKIP=1` and disable hooks in these child runs, so they cannot
+   log themselves or loop.
 8. **Recall (later).** Recording the objective prints the three closest past sessions, items and wiki notes.
    It is a nudge that surfaces forgotten work, and it never blocks.
 
@@ -370,7 +372,13 @@ tables. Reply-length rules in prose also kept failing, until a hook enforced the
 | `Stop` | refuse to end the turn | `{"decision": "block", "reason": "..."}`; check `stop_hook_active` to avoid loops |
 | `SessionEnd`, `SubagentStop` | record facts | none |
 
-**Build these, in this order.**
+**Start by measuring.** Run `/context` in a fresh session and note the total and the largest category. We measured a
+default session at 22.9k tokens, about 80% of it tool schemas, against about 3k for four tools plus a custom prompt.
+That is one version's figure, so measure your own. A tool named bare in `permissions.deny` leaves the context. Remove
+only what the measurement says costs you and you never use, and re-measure. We also believed an output style could
+remove sections of the default prompt until testing showed it could not, so test any stripping claim.
+
+**Build these, in this order.** Items 1 to 3 and 5 run daily for us. Items 4 and 6 do not; each says why.
 
 1. **Context gate.** Three token thresholds in one JSON file: advise, ask for a handover, and block new prompts.
    We use 200,000, 260,000 and 310,000, but **scale them to the user's context window**. No auto-compaction
@@ -381,11 +389,14 @@ tables. Reply-length rules in prose also kept failing, until a hook enforced the
    each segment, never a substring**, so a grep that mentions a command does not trigger it. Answer `ask`, so the
    user decides. Workers are told: do not work around a denial, report it.
 3. **Write fences.** Research agent (Part 2), analyst read-only (Part 5), and ledger files writable only by their script.
-4. **Locked checks.** A `.locked-checks` file lists tests or acceptance files. Deny edits to them, so a builder cannot
-   weaken the test it must pass. For a researcher, this suits pre-registered analysis plans and validation checks.
+4. **Locked checks (optional; we built this, then switched it off).** A `.locked-checks` file lists tests or acceptance
+   files. Deny edits to them, so a builder cannot weaken the test it must pass. It is no longer registered in our
+   settings, so it has no current evidence behind it. We suggest it because it may suit pre-registered analysis plans and
+   validation checks. Build it only if that appeals, and judge it yourself.
 5. **Reply-length gate.** A `Stop` hook counts prose words and blocks over a limit, asking for a TLDR. Ours is 220.
-6. **Fire log.** Each hook appends `{ts, hook, rule, action, session}` to a file. Review it occasionally: a hook that
-   never fires may be dead, and one that fires constantly may be wrong.
+6. **Fire log (optional; written but not wired in for us).** Each hook appends `{ts, hook, rule, action, session}` to a
+   file. The idea is sound: a hook that never fires may be dead, and one that fires constantly may be wrong. We have the
+   helper, but no hook calls it, so we have no results from it.
 
 **Practice.** Keep the numbers in one JSON file. Keep hooks fast, with few dependencies, and fail open unless they are
 safety gates. Test each with hand-made JSON, then once for real. Also review what Claude Code turns on by default, and
